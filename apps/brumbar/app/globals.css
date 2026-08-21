@@ -32,6 +32,10 @@ button { color: inherit; font: inherit; }
 .hp-card { padding: 15px 16px 13px; border-radius: 22px; }
 .card-label { display: flex; justify-content: space-between; align-items: center; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; }
 .card-label b { color: #6f6b64; font-size: 9px; }
+.max-hp-control { display: flex; align-items: center; gap: 5px; color: #77736c; font-size: 9px; letter-spacing: .08em; }
+.max-hp-control button { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid var(--line); border-radius: 9px; padding: 0; background: #292a29; color: #c0b7aa; font-size: 17px; line-height: 1; cursor: pointer; }
+.max-hp-control button:disabled { color: #55524d; cursor: default; }
+.max-hp-control strong { min-width: 24px; color: #d9d0c2; font-family: Georgia, serif; font-size: 17px; text-align: center; letter-spacing: 0; }
 .hp-control { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; margin: 7px 0; }
 .hp-control button { height: 42px; border: 1px solid var(--line); border-radius: 14px; background: #292a29; font-size: 24px; cursor: pointer; }
 .hp-control strong { text-align: center; font-family: Georgia, serif; font-size: 49px; line-height: 1; }

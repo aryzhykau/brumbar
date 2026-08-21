@@ -498,6 +498,15 @@ export default function Home() {
     hp: Math.max(0, Math.min(current.maxHp, current.hp + amount)),
   }));
 
+  const changeMaxHp = (amount: number) => setCharacter((current) => {
+    const maxHp = Math.max(1, current.maxHp + amount);
+    return {
+      ...current,
+      maxHp,
+      hp: Math.min(current.hp, maxHp),
+    };
+  });
+
   const toggleCondition = (condition: string) => setCharacter((current) => ({
     ...current,
     conditions: current.conditions.includes(condition)
@@ -637,7 +646,19 @@ export default function Home() {
         <>
           <section className="status-grid" aria-label="Основные показатели">
             <article className="hp-card">
-              <div className="card-label"><span>Хиты</span><b>МАКС. {data.maxHp}</b></div>
+              <div className="card-label">
+                <span>Хиты</span>
+                <div className="max-hp-control" aria-label={`Максимум хитов: ${data.maxHp}`}>
+                  <span>Макс.</span>
+                  <button
+                    aria-label="Уменьшить максимум хитов на один"
+                    disabled={data.maxHp <= 1}
+                    onClick={() => changeMaxHp(-1)}
+                  >−</button>
+                  <strong>{data.maxHp}</strong>
+                  <button aria-label="Увеличить максимум хитов на один" onClick={() => changeMaxHp(1)}>+</button>
+                </div>
+              </div>
               <div className="hp-control">
                 <button aria-label="Уменьшить хиты на один" onClick={() => changeHp(-1)}>−</button>
                 <strong>{data.hp}</strong>
