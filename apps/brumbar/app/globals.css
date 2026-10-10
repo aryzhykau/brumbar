@@ -46,6 +46,18 @@ button { color: inherit; font: inherit; }
 .quick-stats span, .quick-stats small { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .09em; }
 .quick-stats strong { margin: 4px 0 1px; font-family: Georgia, serif; font-size: 30px; }
 .quick-stats small { font-size: 8px; }
+.level-up-card { margin-top: 10px; border: 1px solid rgba(197,141,66,.3); border-radius: 22px; padding: 17px; background: radial-gradient(circle at 100% 0, rgba(197,141,66,.14), transparent 48%), #1c1c1b; }
+.level-up-card h2 { margin: 0; font-family: Georgia, serif; font-size: 24px; }
+.level-up-card p:not(.eyebrow) { margin: 8px 0 0; color: #b9b0a3; font-size: 11px; line-height: 1.55; }
+.level-up-form { display: grid; grid-template-columns: 92px 1fr; gap: 8px; margin-top: 15px; }
+.level-up-form label { grid-column: 1 / -1; color: #c5a36c; font-size: 9px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.level-up-form input { min-width: 0; border: 1px solid var(--line); border-radius: 12px; outline: 0; padding: 0 12px; background: #111212; color: var(--ink); font-size: 17px; font-weight: 800; }
+.level-up-form input:focus { border-color: rgba(240,106,60,.65); }
+.level-up-form button { min-height: 43px; border: 1px solid var(--line); border-radius: 12px; background: #292a29; font-size: 11px; font-weight: 900; cursor: pointer; }
+.level-up-form button.primary { border-color: var(--ember); background: var(--ember); color: #21100a; }
+.level-up-form button:disabled { border-color: var(--line); background: #222323; color: #5e5b56; cursor: default; }
+.level-up-form .level-up-skip { grid-column: 1 / -1; min-height: 32px; border: 0; background: transparent; color: #79756e; font-size: 9px; }
+.level-up-card > small { display: block; margin-top: 10px; color: #77736c; font-size: 9px; line-height: 1.45; }
 .rage-card { margin-top: 10px; padding: 17px; border-radius: 22px; transition: border-color .2s, background .2s; }
 .rage-card.is-active { border-color: rgba(240,106,60,.48); background: radial-gradient(circle at 110% 20%, rgba(240,106,60,.2), transparent 45%), #1d1918; }
 .rage-heading, .section-title { display: flex; align-items: center; justify-content: space-between; }

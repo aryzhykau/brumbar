@@ -21,6 +21,7 @@ type Weapon = {
 type TurnState = {
   number: number;
   actionUsed: boolean;
+  attacksUsed: number;
   bonusUsed: boolean;
   reactionUsed: boolean;
   movementUsed: number;
@@ -47,6 +48,7 @@ type CharacterData = {
   speed: number;
   hitDie: string;
   hitDiceCurrent: number;
+  levelFiveHpApplied: boolean;
   rageActive: boolean;
   rageUses: number;
   rageMax: number;
@@ -134,9 +136,27 @@ const FEATURES = [
     href: 'https://next.dnd.su/class/barbarian',
   },
   {
+    name: 'Дополнительная атака',
+    tag: '5 уровень · действие Атака',
+    text: 'Когда Брумбар совершает действие Атака в свой ход, он может атаковать дважды вместо одного раза.',
+    href: 'https://next.dnd.su/class/barbarian',
+  },
+  {
+    name: 'Быстрое передвижение',
+    tag: '5 уровень · всегда',
+    text: 'Пока Брумбар не носит тяжёлый доспех, его Скорость увеличивается на 10 футов — до 40 футов.',
+    href: 'https://next.dnd.su/class/barbarian',
+  },
+  {
     name: 'Дварфийская устойчивость',
     tag: 'Вид',
     text: 'Сопротивление урону ядом и преимущество на спасброски против состояния Отравленный.',
+    href: 'https://next.dnd.su/species/dwarf',
+  },
+  {
+    name: 'Дварфийская крепость',
+    tag: 'Вид · каждый уровень',
+    text: 'Максимум хитов дополнительно увеличивается на 1 при получении каждого уровня.',
     href: 'https://next.dnd.su/species/dwarf',
   },
   {
@@ -150,7 +170,7 @@ const FEATURES = [
 const CONDITION_OPTIONS = ['Отравлен', 'Испуган', 'Сбит с ног', 'Схвачен'];
 
 const BASIC_ACTIONS = [
-  { name: 'Рывок', text: 'Получите дополнительное перемещение, равное Скорости: ещё 30 футов.' },
+  { name: 'Рывок', text: 'Получите дополнительное перемещение, равное вашей Скорости.' },
   { name: 'Отход', text: 'До конца хода ваше перемещение не провоцирует атаки.' },
   { name: 'Уклонение', text: 'Атаки видимых врагов по вам идут с помехой; спасброски Ловкости — с преимуществом.' },
   { name: 'Помощь', text: 'Дайте союзнику преимущество на подходящую проверку или следующую атаку.' },
@@ -163,15 +183,16 @@ const DEFAULT_DATA: CharacterData = {
   charClass: 'Варвар',
   race: 'Горный дварф',
   background: 'Кузнец',
-  level: 4,
-  proficiency: 2,
+  level: 5,
+  proficiency: 3,
   hp: 25,
   maxHp: 25,
   tempHp: 0,
   ac: 14,
-  speed: 30,
+  speed: 40,
   hitDie: 'к12',
-  hitDiceCurrent: 4,
+  hitDiceCurrent: 5,
+  levelFiveHpApplied: false,
   rageActive: false,
   rageUses: 2,
   rageMax: 3,
@@ -195,7 +216,7 @@ const DEFAULT_DATA: CharacterData = {
   deathFails: 0,
   equipment: 'Дорожная одежда, рюкзак, спальник, столовый набор, трутница, 10 факелов, рационы, бурдюк с элем, верёвка и инструменты кузнеца.',
   sessionNotes: '',
-  turn: { number: 1, actionUsed: false, bonusUsed: false, reactionUsed: false, movementUsed: 0, dashUsed: false },
+  turn: { number: 1, actionUsed: false, attacksUsed: 0, bonusUsed: false, reactionUsed: false, movementUsed: 0, dashUsed: false },
 };
 
 function modifier(score: number) {
@@ -297,6 +318,7 @@ function buildFromExport(raw: JsonRecord): CharacterData {
     speed: Number(getValue(vitality.speed, DEFAULT_DATA.speed)),
     hitDie: String(getValue(vitality['hit-die'], 'd12')).replace('d', 'к'),
     hitDiceCurrent: Number(getValue(vitality['hp-dice-current'], profileLevel)),
+    levelFiveHpApplied: Boolean(companion.levelFiveHpApplied),
     rageUses: Math.min(Number(rageResource?.current ?? rageMax), rageMax),
     rageMax,
     rageActive: Boolean(companion.rageActive),
@@ -323,16 +345,31 @@ function buildFromExport(raw: JsonRecord): CharacterData {
 }
 
 function normalizeCharacterData(value: CharacterData): CharacterData {
-  return {
+  const normalized = {
     ...DEFAULT_DATA,
     ...value,
     turn: { ...DEFAULT_DATA.turn, ...value.turn },
+  };
+
+  if (normalized.level !== 4) return normalized;
+
+  return {
+    ...normalized,
+    level: 5,
+    proficiency: 3,
+    speed: normalized.speed + 10,
+    hitDiceCurrent: Math.min(5, normalized.hitDiceCurrent + 1),
+    rageMax: 3,
+    rageUses: Math.min(normalized.rageUses, 3),
+    levelFiveHpApplied: false,
+    turn: { ...normalized.turn, attacksUsed: 0 },
   };
 }
 
 function makeExport(raw: JsonRecord | null, data: CharacterData): JsonRecord {
   const outer = raw ? structuredClone(raw) : { jsonType: 'character', version: '2', edition: '2024' };
   const inner = typeof outer.data === 'string' ? getRecord(JSON.parse(outer.data)) : getRecord(outer.data);
+  const info = getRecord(inner.info);
   const vitality = getRecord(inner.vitality);
   const coins = getRecord(inner.coins);
   const resources = getRecord(inner.resources);
@@ -342,6 +379,7 @@ function makeExport(raw: JsonRecord | null, data: CharacterData): JsonRecord {
     ['hp-max', data.maxHp],
     ['hp-temp', data.tempHp],
     ['hp-dice-current', data.hitDiceCurrent],
+    ['speed', data.speed],
   ] as const) {
     const field = getRecord(vitality[key]);
     field.value = value;
@@ -350,6 +388,12 @@ function makeExport(raw: JsonRecord | null, data: CharacterData): JsonRecord {
   vitality.deathSuccesses = data.deathSuccesses;
   vitality.deathFails = data.deathFails;
   inner.vitality = vitality;
+
+  const levelField = getRecord(info.level);
+  levelField.value = data.level;
+  info.level = levelField;
+  inner.info = info;
+  inner.proficiency = data.proficiency;
 
   (['gp', 'sp', 'cp'] as const).forEach((key) => {
     const field = getRecord(coins[key]);
@@ -374,6 +418,7 @@ function makeExport(raw: JsonRecord | null, data: CharacterData): JsonRecord {
   outer._dndHelper = {
     rageActive: data.rageActive,
     reckless: data.reckless,
+    levelFiveHpApplied: data.levelFiveHpApplied,
     conditions: data.conditions,
     sessionNotes: data.sessionNotes,
     turn: data.turn,
@@ -399,6 +444,7 @@ export default function Home() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('loading');
   const [featureSearch, setFeatureSearch] = useState('');
   const [attackEntry, setAttackEntry] = useState<AttackEntry | null>(null);
+  const [levelUpHpRoll, setLevelUpHpRoll] = useState('');
   const [linkedFile, setLinkedFile] = useState(false);
   const [filePickerSupported, setFilePickerSupported] = useState(false);
   const readyRef = useRef(false);
@@ -427,7 +473,7 @@ export default function Home() {
             const imported = (await response.json()) as JsonRecord;
             if (!cancelled) {
               setRawExport(imported);
-              setData(buildFromExport(imported));
+              setData(normalizeCharacterData(buildFromExport(imported)));
             }
           }
         }
@@ -441,9 +487,12 @@ export default function Home() {
       }
     }
     load();
-    setFilePickerSupported('showOpenFilePicker' in window);
+    const capabilityTimer = window.setTimeout(() => setFilePickerSupported('showOpenFilePicker' in window), 0);
     if ('serviceWorker' in navigator) navigator.serviceWorker.register(`${BASE_PATH}/sw.js`).catch(() => undefined);
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      window.clearTimeout(capabilityTimer);
+    };
   }, []);
 
   useEffect(() => {
@@ -476,9 +525,15 @@ export default function Home() {
 
   const strMod = modifier(data.stats.str);
   const dexMod = modifier(data.stats.dex);
+  const conMod = modifier(data.stats.con);
   const attackBonus = strMod + data.proficiency;
   const rageDamage = data.rageActive ? 2 : 0;
   const movementMax = data.speed * (data.turn.dashUsed ? 2 : 1);
+  const attackMax = data.level >= 5 ? 2 : 1;
+  const levelUpRoll = Number(levelUpHpRoll);
+  const levelUpHpGain = Number.isInteger(levelUpRoll) && levelUpRoll >= 1 && levelUpRoll <= 12
+    ? Math.max(1, levelUpRoll + conMod + 1)
+    : null;
   const attackWeapon = attackEntry ? data.weapons.find((weapon) => weapon.id === attackEntry.weaponId) ?? null : null;
   const naturalAttackRoll = attackEntry?.attackRoll ? Number(attackEntry.attackRoll) : null;
   const damageDiceResult = attackEntry?.damageRoll ? Number(attackEntry.damageRoll) : null;
@@ -520,7 +575,7 @@ export default function Home() {
     try {
       const imported = JSON.parse(await file.text()) as JsonRecord;
       setRawExport(imported);
-      setData(buildFromExport(imported));
+      setData(normalizeCharacterData(buildFromExport(imported)));
       setSaveStatus('saved');
     } catch {
       setSaveStatus('error');
@@ -540,7 +595,7 @@ export default function Home() {
       handleRef.current = handle;
       setLinkedFile(true);
       setRawExport(imported);
-      setData(buildFromExport(imported));
+      setData(normalizeCharacterData(buildFromExport(imported)));
     } catch {
       // Cancelling the picker should not interrupt the app.
     }
@@ -568,29 +623,36 @@ export default function Home() {
   const spendTurnPart = (part: 'actionUsed' | 'bonusUsed' | 'reactionUsed') => {
     setCharacter((current) => ({
       ...current,
-      turn: { ...current.turn, [part]: !current.turn[part] },
+      turn: {
+        ...current.turn,
+        [part]: !current.turn[part],
+        ...(part === 'actionUsed' && current.turn.actionUsed ? { attacksUsed: 0 } : {}),
+      },
     }));
   };
-
-  const useAction = () => setCharacter((current) => ({
-    ...current,
-    turn: { ...current.turn, actionUsed: true },
-  }));
 
   const openAttackCalculator = (weaponId: string) => {
     setAttackEntry({ weaponId, attackRoll: '', damageRoll: '' });
   };
 
   const finishAttack = () => {
-    useAction();
+    setCharacter((current) => {
+      const maxAttacks = current.level >= 5 ? 2 : 1;
+      const attacksUsed = Math.min(maxAttacks, current.turn.attacksUsed + 1);
+      return {
+        ...current,
+        turn: { ...current.turn, attacksUsed, actionUsed: attacksUsed >= maxAttacks },
+      };
+    });
     setAttackEntry(null);
   };
 
-  const useBasicAction = (name: string) => setCharacter((current) => ({
+  const takeBasicAction = (name: string) => setCharacter((current) => ({
     ...current,
     turn: {
       ...current.turn,
       actionUsed: true,
+      attacksUsed: 0,
       dashUsed: name === 'Рывок' ? true : current.turn.dashUsed,
     },
   }));
@@ -620,12 +682,23 @@ export default function Home() {
     turn: {
       number: current.turn.number + 1,
       actionUsed: false,
+      attacksUsed: 0,
       bonusUsed: false,
       reactionUsed: false,
       movementUsed: 0,
       dashUsed: false,
     },
   }));
+
+  const applyLevelFiveHp = () => {
+    if (levelUpHpGain === null) return;
+    setCharacter((current) => ({
+      ...current,
+      maxHp: current.maxHp + levelUpHpGain,
+      levelFiveHpApplied: true,
+    }));
+    setLevelUpHpRoll('');
+  };
 
   return (
     <main className="app-shell">
@@ -678,6 +751,34 @@ export default function Home() {
               <article><span>Скорость</span><strong>{data.speed}</strong><small>футов</small></article>
             </div>
           </section>
+
+          {!data.levelFiveHpApplied && (
+            <section className="level-up-card">
+              <div>
+                <p className="eyebrow">5 уровень</p>
+                <h2>Добавь новые хиты</h2>
+                <p>Брось к12 и введи результат. Приложение добавит <b>+{conMod}</b> за Телосложение и <b>+1</b> за Дварфийскую крепость.</p>
+              </div>
+              <div className="level-up-form">
+                <label htmlFor="level-up-hp">Результат к12</label>
+                <input
+                  id="level-up-hp"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="12"
+                  value={levelUpHpRoll}
+                  onChange={(event) => setLevelUpHpRoll(event.target.value)}
+                  placeholder="1–12"
+                />
+                <button className="primary" disabled={levelUpHpGain === null} onClick={applyLevelFiveHp}>
+                  {levelUpHpGain === null ? 'Введи бросок' : `+${levelUpHpGain} к максимуму`}
+                </button>
+                <button className="level-up-skip" onClick={() => setCharacter({ levelFiveHpApplied: true })}>Уже учтено</button>
+              </div>
+              <small>Текущие хиты не изменятся до лечения или долгого отдыха.</small>
+            </section>
+          )}
 
           <section className={`rage-card ${data.rageActive ? 'is-active' : ''}`}>
             <div className="rage-heading">
@@ -757,7 +858,8 @@ export default function Home() {
 
           <div className="economy-grid" aria-label="Экономика хода">
             <button className={data.turn.actionUsed ? 'spent' : ''} onClick={() => spendTurnPart('actionUsed')}>
-              <span>Действие</span><strong>{data.turn.actionUsed ? 'Потрачено' : 'Доступно'}</strong>
+              <span>Действие</span>
+              <strong>{data.turn.actionUsed ? 'Потрачено' : data.turn.attacksUsed > 0 ? `Атака ${data.turn.attacksUsed} из ${attackMax}` : 'Доступно'}</strong>
             </button>
             <button className={data.turn.bonusUsed ? 'spent' : ''} onClick={() => spendTurnPart('bonusUsed')}>
               <span>Бонусное</span><strong>{data.turn.bonusUsed ? 'Потрачено' : 'Доступно'}</strong>
@@ -781,7 +883,7 @@ export default function Home() {
           </div>
 
           <section className="combat-section">
-            <div className="combat-section-title"><span>01</span><div><p>Действие</p><h3>Атаковать</h3></div></div>
+            <div className="combat-section-title"><span>01</span><div><p>Действие · {attackMax} атаки</p><h3>Атаковать</h3></div></div>
             <div className="combat-weapon-list">
               {data.weapons.map((weapon) => (
                 <article className="combat-weapon" key={weapon.id}>
@@ -793,7 +895,13 @@ export default function Home() {
                     <div><small>{data.reckless ? 'С преимуществом' : 'Бросьте'}</small><strong>{data.reckless ? '2к20' : 'к20'} {signed(weapon.isProf ? attackBonus : strMod)}</strong></div>
                     <div><small>Урон</small><strong>{weapon.damageDie} {signed(strMod + rageDamage)}</strong></div>
                   </div>
-                  <button disabled={data.turn.actionUsed} onClick={() => openAttackCalculator(weapon.id)}>{data.turn.actionUsed ? 'Действие потрачено' : 'Рассчитать атаку'}</button>
+                  <button disabled={data.turn.actionUsed || data.turn.attacksUsed >= attackMax} onClick={() => openAttackCalculator(weapon.id)}>
+                    {data.turn.actionUsed
+                      ? 'Действие потрачено'
+                      : attackMax === 2
+                        ? data.turn.attacksUsed === 0 ? 'Рассчитать первую атаку' : 'Рассчитать вторую атаку'
+                        : 'Рассчитать атаку'}
+                  </button>
                 </article>
               ))}
             </div>
@@ -807,7 +915,7 @@ export default function Home() {
             <div className="combat-section-title"><span>02</span><div><p>Действие</p><h3>Другие варианты</h3></div></div>
             <div className="basic-action-grid">
               {BASIC_ACTIONS.map((action) => (
-                <button key={action.name} disabled={data.turn.actionUsed} onClick={() => useBasicAction(action.name)}>
+                <button key={action.name} disabled={data.turn.actionUsed || data.turn.attacksUsed > 0} onClick={() => takeBasicAction(action.name)}>
                   <strong>{action.name}</strong><span>{action.text}</span>
                 </button>
               ))}
@@ -987,7 +1095,9 @@ export default function Home() {
 
             <div className="attack-modal-actions">
               <button onClick={() => setAttackEntry(null)}>Отмена</button>
-              <button className="primary" disabled={naturalAttackRoll === null} onClick={finishAttack}>Завершить атаку</button>
+              <button className="primary" disabled={naturalAttackRoll === null} onClick={finishAttack}>
+                {data.turn.attacksUsed + 1 < attackMax ? 'Завершить · ещё 1 атака' : 'Завершить атаку'}
+              </button>
             </div>
           </section>
         </div>
